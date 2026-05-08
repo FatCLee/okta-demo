@@ -224,6 +224,153 @@ For both providers, the backend validates:
 
 The frontend may use decoded/profile info for display, such as "Hello, Jamie". Backend authorization uses the raw bearer token and local business data.
 
+## How Invitation Works
+
+Invitation has two parts working together:
+
+```text
+App invitation = business workflow
+Okta activation = identity account setup
+```
+
+Okta does not know what a KYC case is. The backend does.
+
+### Frontend Role
+
+The frontend is the RM operator surface.
+
+For RM invite creation, the frontend:
+
+1. Signs the RM in with Microsoft Entra ID.
+2. Gets an Entra access token from MSAL.
+3. Collects client email, client name, existing-account status, and RM name.
+4. Calls the backend invite endpoint with the Entra token.
+
+Example request:
+
+```http
+POST /api/cases/invite
+Authorization: Bearer <entra_access_token>
+Content-Type: application/json
+```
+
+Example body:
+
+```json
+{
+  "clientEmail": "client@example.com",
+  "clientName": "Client Name",
+  "hasExistingAccount": false,
+  "relationshipManager": "Jamie RM"
+}
+```
+
+The frontend does not create the Okta user. It does not decide whether the RM is allowed to create the invite. It sends the RM token and invite details to the backend.
+
+### Backend Role
+
+The backend owns the real invitation.
+
+For invite creation, the backend:
+
+1. Validates the Entra access token.
+2. Confirms the caller is allowed to create an invite.
+3. Creates or finds the local `ApplicationUser` for the client.
+4. Creates or finds the local `ApplicationUser` for the RM.
+5. Creates a `KycCase`.
+6. Creates a `ClientInvite`.
+7. Calls Okta if the client is new and Okta Management API is configured.
+8. Stores Okta activation information on the invite.
+9. Returns invite details to the frontend.
+
+The backend stores business meaning in local records:
+
+```text
+ApplicationUser
+UserRole
+UserRoleAssignment
+IdentityProviderAccount
+KycCase
+ClientInvite
+```
+
+That lets the backend represent facts such as:
+
+```text
+Jamie RM invited client@example.com for KYC case 123.
+This invite is pending, sent, redeemed, or activation-ready.
+This invite belongs to Okta user 00uabc123.
+```
+
+### Okta Role
+
+Okta owns the external identity account lifecycle.
+
+For a new client, the backend calls Okta to:
+
+1. Create an Okta user with `activate=false`.
+2. Call the Okta lifecycle activation endpoint.
+3. Receive an `activationUrl`.
+
+Okta knows:
+
+```text
+This Okta user exists.
+This user needs activation.
+This activation link is valid.
+This user can set a password, enroll factors, and sign in.
+```
+
+Okta does not know:
+
+```text
+This invite belongs to KYC case 123.
+This RM created the invite.
+This client should see a specific banking workflow.
+```
+
+### New Client Flow
+
+For a new client:
+
+1. RM uses the frontend to submit invite details.
+2. Frontend calls `POST /api/cases/invite` with the Entra access token.
+3. Backend validates the Entra token.
+4. Backend creates local client, case, and invite records.
+5. Backend creates a staged Okta user.
+6. Backend requests an Okta activation link.
+7. Okta returns `activationUrl`.
+8. Backend stores `activationUrl` on `ClientInvite`.
+9. Backend returns invite details to the frontend.
+10. Frontend shows or sends the activation link.
+11. Client opens the Okta activation link.
+12. Okta activates the account.
+13. Client signs in through Okta.
+14. Frontend receives an Okta token.
+15. Backend validates the Okta token and maps the user to the case.
+
+### Existing Client Flow
+
+For a client who already has an Okta account:
+
+1. RM uses the frontend to submit invite details.
+2. Frontend calls `POST /api/cases/invite` with the Entra access token.
+3. Backend validates the Entra token.
+4. Backend creates local case and invite records.
+5. Backend does not need to create a new Okta user.
+6. Backend returns invite details to the frontend.
+7. Client signs in with the existing Okta account.
+8. Frontend receives an Okta token.
+9. Backend validates the token and maps the user to the case/invite.
+
+The guiding rule is:
+
+```text
+Frontend: collect invite details and display next step
+Backend: create, authorize, and store the business invite
+Okta: create, activate, and sign in the external identity
+```
+
 ## Invitation Versus Activation
 
 Invitation is the app's business concept. Activation is Okta's identity lifecycle.
