@@ -80,6 +80,150 @@ This is the internal-user flow through Microsoft Entra ID.
 8. Backend confirms the user is authorized as an RM.
 9. Backend allows RM-only actions.
 
+## Token Handoff To The Backend
+
+After Okta or Entra login, the frontend does not forward the whole login response object to the backend. The auth SDK handles the redirect callback, stores tokens, and gives the frontend an access token.
+
+The frontend sends that access token to the backend with an HTTP header:
+
+```http
+Authorization: Bearer <access_token>
+```
+
+The backend validates the raw access token. It should not trust frontend-decoded profile data for authorization.
+
+### Okta Token Handoff
+
+Okta redirects the browser back to:
+
+```text
+/login/callback?code=...
+```
+
+The frontend handles the callback and gets the access token:
+
+```ts
+await oktaAuth.handleRedirect();
+
+const isAuthenticated = await oktaAuth.isAuthenticated();
+const userInfo = await oktaAuth.getUser();
+const accessToken = await oktaAuth.tokenManager.get("accessToken");
+```
+
+Then the frontend calls the backend:
+
+```ts
+await fetch("/api/client/session", {
+  headers: {
+    Authorization: `Bearer ${accessToken.accessToken}`,
+  },
+});
+```
+
+A decoded Okta access token payload may look like this:
+
+```json
+{
+  "ver": 1,
+  "jti": "AT.xxxxx",
+  "iss": "https://your-domain.okta.com/oauth2/default",
+  "aud": "api://default",
+  "sub": "00uabc123",
+  "cid": "your-okta-client-id",
+  "uid": "00uabc123",
+  "scp": ["openid", "profile", "email"],
+  "auth_time": 1710000000,
+  "exp": 1710003600,
+  "iat": 1710000000
+}
+```
+
+If Okta groups are configured as an access-token claim, the token may also include:
+
+```json
+{
+  "groups": ["KYC_Client"]
+}
+```
+
+### Entra Token Handoff
+
+Microsoft Entra ID redirects the browser back to:
+
+```text
+/rm/callback?code=...
+```
+
+The frontend handles the callback and gets the access token:
+
+```ts
+await msalInstance.initialize();
+
+const redirectResult = await msalInstance.handleRedirectPromise();
+const account = redirectResult?.account ?? msalInstance.getAllAccounts()[0];
+
+const tokenResult = await msalInstance.acquireTokenSilent({
+  account,
+  scopes: getEntraApiScopes(),
+});
+```
+
+Then the frontend calls the backend:
+
+```ts
+await fetch("/api/rm/session", {
+  headers: {
+    Authorization: `Bearer ${tokenResult.accessToken}`,
+  },
+});
+```
+
+RM invite creation uses the same pattern:
+
+```ts
+await fetch("/api/cases/invite", {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${tokenResult.accessToken}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify(inviteForm),
+});
+```
+
+A decoded Entra access token payload may look like this:
+
+```json
+{
+  "aud": "api://your-api-application-client-id",
+  "iss": "https://login.microsoftonline.com/<tenant-id>/v2.0",
+  "iat": 1710000000,
+  "nbf": 1710000000,
+  "exp": 1710003600,
+  "azp": "your-spa-client-id",
+  "name": "Jamie RM",
+  "oid": "00000000-0000-0000-0000-000000000000",
+  "preferred_username": "jamie@company.com",
+  "scp": "access_as_user",
+  "sub": "...",
+  "tid": "<tenant-id>",
+  "ver": "2.0"
+}
+```
+
+### Backend Validation
+
+For both providers, the backend validates:
+
+- Token signature.
+- Issuer.
+- Audience.
+- Expiration.
+- Scopes, groups, or claims if needed.
+- Local user, role, case, and invite mapping.
+
+The frontend may use decoded/profile info for display, such as "Hello, Jamie". Backend authorization uses the raw bearer token and local business data.
+
 ## Invitation Versus Activation
 
 Invitation is the app's business concept. Activation is Okta's identity lifecycle.
@@ -100,6 +244,26 @@ Okta owns:
 - Hosted sign-in after activation.
 
 For this demo, the preferred model is app-managed invitation with Okta-managed activation. The backend stores an invite record and calls Okta to create/activate the user. The activation link can be delivered by the app or, if desired, by Okta's built-in activation email flow.
+
+## Password And Account Management
+
+Password changes stay with the identity provider. The frontend can provide links into the provider-owned account pages, but the backend should not receive old or new passwords.
+
+For clients, the app links to Okta account settings:
+
+```text
+https://<okta-org-url>/account-settings/home
+```
+
+The frontend derives `<okta-org-url>` from `VITE_OKTA_ISSUER`.
+
+For RMs, the app links to Microsoft My Sign-Ins password change:
+
+```text
+https://mysignins.microsoft.com/security-info/password/change?tileType=ChangePassword
+```
+
+These links are frontend-only navigation. They do not call the backend API.
 
 ## Mental Model
 

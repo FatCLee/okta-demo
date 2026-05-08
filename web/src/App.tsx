@@ -1,5 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { AccountInfo } from "@azure/msal-browser";
+import {
+  getEntraPasswordChangeUrl,
+  getOktaAccountSettingsUrl,
+} from "./accountLinks";
 import type { getEntraApiScopes, hasEntraConfig, msalInstance } from "./entra";
 import type { hasOktaConfig, oktaAuth } from "./okta";
 
@@ -144,6 +148,8 @@ async function loadEntraModule(): Promise<EntraModule> {
 }
 
 export default function App() {
+  const oktaAccountSettingsUrl = getOktaAccountSettingsUrl();
+  const entraPasswordChangeUrl = getEntraPasswordChangeUrl();
   const [cases, setCases] = useState<CaseSummary[]>([]);
   const [inviteForm, setInviteForm] = useState(emptyInviteForm);
   const [loginForm, setLoginForm] = useState(emptyLoginForm);
@@ -511,6 +517,16 @@ export default function App() {
                 {" "}
                 {authState.accessToken ? "Present and ready for API calls" : "Missing"}
               </p>
+              {oktaAccountSettingsUrl && (
+                <a
+                  className="text-action"
+                  href={oktaAccountSettingsUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Manage Okta password and security methods
+                </a>
+              )}
             </div>
             <div className="result-card">
               <strong>Protected API response</strong>
@@ -526,6 +542,16 @@ export default function App() {
               Configure `web/.env`, then sign in as a client to exercise the real
               hosted Okta flow.
             </p>
+            {oktaAccountSettingsUrl && (
+              <a
+                className="text-action"
+                href={oktaAccountSettingsUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open Okta account settings
+              </a>
+            )}
           </div>
         )}
       </section>
@@ -553,6 +579,14 @@ export default function App() {
                 Access token:{" "}
                 {rmAuthState.accessToken ? "Present and ready for API calls" : "Missing"}
               </p>
+              <a
+                className="text-action"
+                href={entraPasswordChangeUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Change Entra ID password
+              </a>
             </div>
             <div className="result-card">
               <strong>Protected RM API response</strong>
@@ -569,6 +603,14 @@ export default function App() {
               Configure `web/.env`, then sign in as an RM to exercise the real
               Microsoft Entra ID flow.
             </p>
+            <a
+              className="text-action"
+              href={entraPasswordChangeUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open Microsoft password change
+            </a>
           </div>
         )}
       </section>

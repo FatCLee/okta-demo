@@ -154,6 +154,13 @@ button {
   border: 1px solid rgba(0, 87, 163, 0.08);
 }
 
+.text-action {
+  display: inline-flex;
+  margin-top: 0.35rem;
+  color: var(--primary-dark);
+  font-weight: 700;
+}
+
 .auth-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
