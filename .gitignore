@@ -1,0 +1,8 @@
+/.DS_Store
+api/app_data/
+api/bin/
+api/obj/
+web/dist/
+web/node_modules/
+web/.env
+web/node_modules/.tmp/
