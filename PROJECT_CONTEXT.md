@@ -1,4 +1,7 @@
 # OKTA DEMO
+
+中文版本：[PROJECT_CONTEXT.zh-CN.md](PROJECT_CONTEXT.zh-CN.md)
+
 This is a demo project that showcase how Identity Providers will be integrated into a website. The outcome of this project will be used as a reference and integrated into a existing under-developement project, which does not have any implementation of IdP integration, knowing that 
 - OKTA will be the option for external clients, where the clients will get invitation codes to sign up, also a one-time passcode to log-in, assuming it's provided by OKTA.
 - Microsoft Entra ID, for internal users.

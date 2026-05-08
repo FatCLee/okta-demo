@@ -1,5 +1,7 @@
 # Authentication And Invitation Flow
 
+中文版本：[auth-flow.zh-CN.md](auth-flow.zh-CN.md)
+
 This project separates identity, business authorization, and user experience:
 
 - Frontend owns the browser experience.

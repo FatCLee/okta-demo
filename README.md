@@ -1,5 +1,7 @@
 # Okta Demo
 
+中文版本：[README.zh-CN.md](README.zh-CN.md)
+
 Starter implementation for a bank KYC identity-provider demo:
 
 - `web/`: React + Vite frontend showing the RM invite flow and client login/redeem flow
